@@ -678,7 +678,138 @@ describe('share location', () => {
 });
 ```
 
-#### Using stubs across tests
+#### Stubs with arguments, return values and using stubs across tests
+
+```javascript
+// create stubs before each test
+beforeEach('share location', () => {
+    cy.visit('/').then(win => {
+        cy.stub(win.navigator.geolocation, 'getCurrentPosition')
+            .as('getUserPosition') // assign alias
+            .callsFake((callBack) => {
+                setTimeout(() => {
+                    const fakePositionObject = {
+                        coords: {
+                            latitude: 37.5,
+                            longitude: 48.01,
+                        }
+                    };
+                    callBack(fakePositionObject);
+                }, 100);
+
+            });
+
+        // stub with empty function that returns a promise that resolves immediately
+        cy.stub(win.navigator.clipboard, 'writeText').as('saveToClipboard').resolves();
+    });
+});
+
+describe('share location', () => {
+    it('should fetch the user location', () => {
+        // ...
+    });
+
+    it('should copy the location to the clipboard', () => {
+        cy.get('[data-cy="name-input"]').type("John Doe");
+        cy.get('[data-cy="get-loc-btn"]').click();
+        cy.get('[data-cy="share-loc-btn"]').click();
+        cy.get('@saveToClipboard').should('have.been.called');
+        // check if it is called with a correct argument
+        cy.get('@saveToClipboard').should('have.been.calledWithMatch', 
+            new RegExp(`.*${37.5}.*${48.01}.*${encodeURI('John Doe')}`));
+    });
+});
+```
+
+### Using fixtures
+
+In the above example, we hardcoded name and position data and had to copy it to multiple places in the tests.
+
+We could have defined normal JS variables at the top of the file, e.g. `const name='John Doe';`, but then these could have been used only in the current file.
+
+Fixtures are just "fixed dummy data" that can be created in `/cypress/fixtures`, typically as a json file.
+
+The data can then be used by assigning it an alias and wrapping the code that uses the fixture in a callback.
+
+Example:
+
+`cypress/fixtures/user-location.json`
+
+```json
+{
+  "coords": {
+    "latitude": 37.5,
+    "longitude": 48.01
+  }
+}
+```
+
+`location.cy.js` (the test file)
+
+```javascript
+
+// ...
+// usage in the beforeEach hook
+cy.fixture('user-location.json').as('userLocation');
+cy.visit('/').then(win => {
+    cy.get('@userLocation').then(fakePosition => {
+        cy.stub(win.navigator.geolocation, 'getCurrentPosition')
+            .as('getUserPosition') // assign alias
+            .callsFake((callBack) => {
+                setTimeout(() => {
+                    callBack(fakePosition);
+                }, 100);
+            });
+    })
+});
+// ...
+// usage in the test
+    cy.get('@userLocation').then(fakePosition=>{
+        const {latitude, longitude} = fakePosition.coords;
+        cy.get('@saveToClipboard').should('have.been.calledWithMatch',
+            new RegExp(`.*${latitude}.*${longitude}.*${encodeURI('John Doe')}`));
+    })
+```
+
+### Spies
+
+Spies are *listeners* that can be attached to a function / method similar to stubs that doesn't change the function but evaluates function calls and the passed in parameters.
+
+```javascript
+// set up spies
+cy.spy(win.localStorage, 'setItem').as('storeLocation');
+cy.spy(win.localStorage, 'getItem').as('getLocation');
+
+// ...
+
+cy.get('@userLocation').then(fakePosition=>{
+    const {latitude, longitude} = fakePosition.coords;
+    // ...
+    cy.get('@storeLocation').should('have.been.called');
+    cy.get('@storeLocation').should('have.been.calledWithMatch', 
+        /John Doe/, // check first argument of setItem 
+        new RegExp(`.*${latitude}.*${longitude}.*${encodeURI('John Doe')}`) // second argument
+    );
+    cy.get('@getLocation').should('have.been.called');
+
+});
+```
+
+### Timers / manipulating the clock
+```javascript
+beforeEach('share location', () => {
+    // make clock / tick available in tests
+    cy.clock(); // must be called before initializing the tests
+});
+
+// in the test:
+cy.tick(2000); // forward the clock by 2 seconds
+// would also work without setting the timer in this case as cypress waits / retries
+// for up to 4 seconds for the test to pass, and the message disappears after 2 seconds
+cy.get('[data-cy="info-message"]').should('not.be.visible');
+```
+
+## Network requests, DBs and authentication
 
 
 

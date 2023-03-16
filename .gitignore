@@ -1,6 +1,7 @@
 ### Node template
 videos/
 screenshots/
+build/
 # Logs
 .idea/
 logs
