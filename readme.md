@@ -2,8 +2,56 @@
 
 Notes on the academind course of the same name
 
-<!-- START doctoc -->
-<!-- END doctoc -->
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [What it is](#what-it-is)
+- [Installation](#installation)
+- [Basics](#basics)
+  - [Implicit and explicit assersions](#implicit-and-explicit-assersions)
+  - [Test isolation](#test-isolation)
+  - [get vs find](#get-vs-find)
+  - [`should` / `and`](#should--and)
+  - [User interaction](#user-interaction)
+  - [Test setup for repeating tasks (test hooks)](#test-setup-for-repeating-tasks-test-hooks)
+  - [Checking for element order](#checking-for-element-order)
+- [Element selection, assertions and more](#element-selection-assertions-and-more)
+  - [Selecting elements -  best practices](#selecting-elements----best-practices)
+  - [Testing navigation](#testing-navigation)
+  - [Chaining commands](#chaining-commands)
+  - [Values and aliases](#values-and-aliases)
+  - [More direct element access with `then()`](#more-direct-element-access-with-then)
+  - [Simulating special key presses](#simulating-special-key-presses)
+  - [Assertion time frame](#assertion-time-frame)
+  - [Losing / gaining focus (blur / focus)](#losing--gaining-focus-blur--focus)
+  - [Running tests without using cypress studio](#running-tests-without-using-cypress-studio)
+  - [Taking screenshots explicitely](#taking-screenshots-explicitely)
+- [Configuration and customization](#configuration-and-customization)
+  - [Timeouts](#timeouts)
+  - [Setting the test browser](#setting-the-test-browser)
+  - [Configuring the baseURL](#configuring-the-baseurl)
+  - [Custom commands and queries](#custom-commands-and-queries)
+    - [Custom commands](#custom-commands)
+    - [Custom queries](#custom-queries)
+  - [Understanding tasks / trigger node functions in tests](#understanding-tasks--trigger-node-functions-in-tests)
+- [Stubs, Spies, Fixtures, Clock](#stubs-spies-fixtures-clock)
+  - [Stubs](#stubs)
+    - [Empty stubs](#empty-stubs)
+    - [Fake stub implementation](#fake-stub-implementation)
+    - [Stubs with arguments, return values and using stubs across tests](#stubs-with-arguments-return-values-and-using-stubs-across-tests)
+  - [Using fixtures](#using-fixtures)
+  - [Spies](#spies)
+  - [Timers / manipulating the clock](#timers--manipulating-the-clock)
+- [Network requests, DBs and authentication](#network-requests-dbs-and-authentication)
+  - [Using interceptors](#using-interceptors)
+  - [Testing APIs with test requests](#testing-apis-with-test-requests)
+  - [Testing authentication flows and asserting cookie values](#testing-authentication-flows-and-asserting-cookie-values)
+  - [Creating a reusable login command](#creating-a-reusable-login-command)
+  - [Accessing interceptor request and response data](#accessing-interceptor-request-and-response-data)
+- [Other links](#other-links)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## What it is
 
