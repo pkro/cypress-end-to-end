@@ -1,4 +1,18 @@
 /// <reference types="cypress" />
+
+Cypress.Commands.add('login', ()=> {
+  cy.visit('/login');
+  cy.get('[data-cy="auth-email"]').click();
+  cy.get('[data-cy="auth-email"]').type("test@example.com");
+  cy.get('[data-cy="auth-password"]').type("testpassword");
+  cy.get('[data-cy="auth-submit"]').click();
+  cy.location('pathname').should("eq", '/takeaways')
+  // same as when signing up
+  cy.getCookie('__session')
+      .its('value')
+      .should('not.be.empty');
+
+})
 // ***********************************************
 // This example commands.ts shows you how to
 // create various custom commands and overwrite

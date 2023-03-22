@@ -811,9 +811,220 @@ cy.get('[data-cy="info-message"]').should('not.be.visible');
 
 ## Network requests, DBs and authentication
 
+The test DB should be set via `.env` files, e.g. `.env.test`. For directus, that would be an additional `.env.test` beside `.env.local`, `.env.dev` etc.
 
+A test database should be seeded before every test. As the cypress tests run in the browser, they must be set up on the backend in `cypress.config.js` to be used later in `beforeEach`:
+
+`cypress.config.js`:
+
+```javascript
+import { defineConfig } from 'cypress';
+
+import { seed } from './prisma/seed-test';
+
+export default defineConfig({
+  e2e: {
+    baseUrl: 'http://localhost:3000',
+    setupNodeEvents(on, config) {
+      // implement node event listeners here
+      on('task', {
+        async seedDatabase() {
+          await seed();
+          return null;
+        }
+      })
+    },
+  },
+});
+```
+
+`sometest.cy.js`:
+
+```javascript
+// ...
+describe('Takeaways', () => {
+    beforeEach(() => {
+        cy.task('seedDatabase');
+    });
+    // ...
+});
+```
+
+### Using interceptors
+
+Problem: if we use the DB / API for a frontend test, the tests take longer to complete due to the network request, even if we just want to test a frontend feature (e.g. if a certain text is displayed after a successful data load).
+
+Interceptors can be used to intercept and simulate http requests.
+
+Interceptors are typically set up before `cy.visit` or in beforeEach as it's a setup for the actual test(s).
+
+Interceptors can be used to set up a spy for the request that don't replace it but give a handle to check e.g. if the request was sent or not:
+
+`cy.intercept('POST', '/newsletter*').as('theRequest');`
+
+To *block* the request and let it return dummy data, we can simply add an object that contains the desired response:
+
+`cy.intercept('POST', '/newsletter*', {status: 201})` would always immediately return status 201 for the intercepted requests.
+
+```javascript
+describe('Newsletter', () => {
+    // ...
+    it('should sign a user up to the newsletter via the sign up form', () => {
+        // typically set up before cy.visit or in beforeEach as it's a setup for the actual test
+        // intercepts any HTTP POST request to localhost:3000/newsletter... (* is a wildcard)
+        cy.intercept('POST',
+            '/newsletter*', {status: 201}) // the base api path is already set up in the cypress config file
+            .as('subscribe'); // optionally set up an alias
+
+        cy.visit('/');
+        cy.get('[data-cy="newsletter-email"]').type('test99@example.com');
+        cy.get('[data-cy="newsletter-submit"]').click();
+        cy.wait('@subscribe'); // wait for the intercepted request to finish - usually not necessary
+        cy.get('[data-cy="newsletter-email"]').should('not.exist');
+        cy.get('footer').should('contain.text', 'Thanks for signing');
+
+    });
+
+    it('should display validation errors', ()=> {
+        cy.intercept('POST', '/newsletter*', {message: 'Email exists already'}).as('subscribe');
+
+        cy.visit('/');
+        cy.get('[data-cy="newsletter-email"]').type('test2@example.com');
+        cy.get('[data-cy="newsletter-submit"]').click();
+        cy.get('[data-cy="newsletter-email"]').should('exist');
+        cy.get('footer').should('contain.text', 'exists already');
+    })
+});
+```
+
+**Gotcha**: in combined SSR / CSR frameworks such as nextjs and remix, some requests are done on the server and can't be intercepted (such as reading a takeaways in the example project, which is done server side and rendered with the retrieved data to the client)
+
+### Testing APIs with test requests
+
+The requests are tested already if we seed the DB and do our tests without intercepting the requests.
+
+For decoupling tests, it might be reasonable to test the API directly using `cy.request`.
+
+```javascript
+it('should successfully create a new contact', ()=> {
+      cy.request({
+          method: 'POST',
+          url: '/newsletter',
+          body: {email: 'test@example.com'},
+          form: true // if formdata is sent, for just JSON data not necessary
+      }).then(res => {
+          expect(res.status).to.equal(201);
+      })
+    });
+```
+
+### Testing authentication flows and asserting cookie values
+
+Side note: when opening the dev tools in the browser that runs the tests, clicking on a step in the test runner shows what it yields and other information.
+
+![console](./readme_images/console.png)
+
+Testing the signup flow:
+
+```javascript
+describe('Auth', ()=>{
+    beforeEach(() => {
+        cy.task('seedDatabase');
+    });
+    it('should sign up a user', ()=>{
+        cy.visit('/signup');
+        cy.get('[data-cy="auth-email"]').click();
+        cy.get('[data-cy="auth-email"]').type("test2@example.com");
+        cy.get('[data-cy="auth-password"]').type("password");
+        cy.get('[data-cy="auth-submit"]').click();
+
+        // 2 indicators that the signup process has succeeded for this application:
+        // - url should contain /takeaways
+        cy.location('pathname').should("eq", '/takeaways')
+
+        // - session cookie should exist
+        cy.getCookie('__session')
+            .its('value') // Get a property's value on the previously yielded subject. https://docs.cypress.io/api/commands/its
+            .should('not.be.empty');
+    });
+
+    // previous user can't be used as the db is reseeded before every test
+    // cookies are automatically cleared by cypress
+    it('should login', ()=>{
+        cy.visit('/login');
+        cy.get('[data-cy="auth-email"]').click();
+        cy.get('[data-cy="auth-email"]').type("test@example.com");
+        cy.get('[data-cy="auth-password"]').type("testpassword");
+        cy.get('[data-cy="auth-submit"]').click();
+        cy.location('pathname').should("eq", '/takeaways')
+        // same as when signing up
+        cy.getCookie('__session')
+            .its('value')
+            .should('not.be.empty');
+        
+        cy.contains('Logout').click();
+        cy.location('pathname').should("eq", '/')
+        cy.getCookie('__session').its('value').should('be.empty');
+    })
+})
+```
+
+### Creating a reusable login command
+
+`cypress/support/commands.js`:
+
+```javascript
+Cypress.Commands.add('login', ()=> {
+  cy.visit('/login');
+  cy.get('[data-cy="auth-email"]').click();
+  cy.get('[data-cy="auth-email"]').type("test@example.com");
+  cy.get('[data-cy="auth-password"]').type("testpassword");
+  cy.get('[data-cy="auth-submit"]').click();
+  cy.location('pathname').should("eq", '/takeaways')
+  cy.getCookie('__session')
+      .its('value')
+      .should('not.be.empty');
+})
+```
+
+... can be called now in any test using `cy.login();`:
+
+```javascript
+it('should login', ()=>{
+        cy.login();
+    })
+
+it('should logout', ()=>{
+    cy.login();
+    cy.contains('Logout').click();
+    cy.location('pathname').should("eq", '/')
+    cy.getCookie('__session').its('value').should('be.empty');
+})
+```
+
+### Accessing interceptor request and response data
+
+```javascript
+it('should create a new takeaway', () => {
+    // block request and stub response
+    cy.intercept('POST',
+        '/takeaways/new*',
+        'success') // the response can be anything we like, e.g. a string we can test easily
+        .as('createTakeaway'); // needed later
+    cy.login();
+    cy.visit('/takeaways/new');
+    cy.get('[data-cy="title"]').click();
+    cy.get('[data-cy="title"]').type('TestTitle1');
+    cy.get('[data-cy="body"]').type('TestBody1');
+    cy.get('[data-cy="create-takeaway"]').click();
+    cy.wait('@createTakeaway') // wait is needed so we can look at what's posted
+        .its('request.body') //
+        .should('match', /.*TestTitle.*TestBody1/)
+});
+```
 
 ## Other links
 
 [adding tests to gitlab](https://medium.com/devops-with-valentine/run-your-cypress-e2e-tests-in-gitlab-ci-complete-guide-909990962001)
 
+https://github.com/cypress-io/cypress-realworld-app
